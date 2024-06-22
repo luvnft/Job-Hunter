@@ -1,0 +1,25 @@
+{
+  "name": "job-scraper",
+  "version": "1.0.0",
+  "description": "Job Scraper with filtering enabled and potentially send job applications automatically",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RonitPatelPFW/Job-Scraper.git"
+  },
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "author": "RonitPatelPFW",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/RonitPatelPFW/Job-Scraper/issues"
+  },
+  "homepage": "https://github.com/RonitPatelPFW/Job-Scraper#readme",
+  "dependencies": {
+    "puppeteer": "^22.12.0"
+  },
+  "devDependencies": {
+    "electron": "^31.0.2"
+  }
+}
