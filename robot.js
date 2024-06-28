@@ -1,9 +1,31 @@
 const puppeteer = require('puppeteer');
+const fs = require('fs');
+const yaml = require('js-yaml');
+const { WebhookClient, EmbedBuilder } = require('discord.js');
+
+let positions = [];
+let locations = [];
+let blacklistCompanies = [];
+let blackListTitles = [];
+let keywords = [];
+let ziprecruiterwebhook = ""
+
 
 async function jobHunter(site) {
     try {
-        
+        const yamlData = yaml.load(fs.readFileSync('config.yaml', 'utf8'))
+        positions = yamlData.positions
+        locations = yamlData.locations
+        blacklistCompanies = yamlData.blacklistCompanies
+        blackListTitles = yamlData.blackListTitles
+        keywords = yamlData.keywords
+        ziprecruiterwebhook = yamlData.ziprecruiterWebhook
+    } catch (error) {
+        console.error(error);
+    }
+    try {
         const browser = await puppeteer.launch({
+            executablePath: '/usr/local/bin/chromium',
             headless: false,
             defaultViewport: null,
             args: [
@@ -30,26 +52,70 @@ async function jobHunter(site) {
         if(site === 'ziprecruiter') {
             await page.goto(`http://www.${site}.com/jobs-search?form=jobs-landing&search=Frontend+Developer&location=USA`);
             await page.click('button[type="button"]')
-            // page.waitForSelector('#react-job-results-root > div > div.job_results_two_pane.overflow-x-hidden > div.pagination_container_two_pane > div.flex.w-full.flex-row.justify-between > div:nth-child(6) > a > p')
-            // const total = await page.$eval('#react-job-results-root > div > div.job_results_two_pane.overflow-x-hidden > div.pagination_container_two_pane > div.flex.w-full.flex-row.justify-between > div:nth-child(6) > a > p', el => el.textContent)
-            let i = 1;
-            while(i != 5) {
-                // await page.waitForSelector('.job_result_wrapper')
+                await page.waitForSelector('.job_result_wrapper')
                 let jobList = await page.$$(".job_result_wrapper")
-                jobList.forEach((job) => {
-                    page.waitForSelector(job)
-                    job.click()
-                })
-                page.waitForSelector('[title="Next Page"]')
+                for(let job of jobList) {
+                    await page.waitForSelector('ul.list-outside.list-disc.pl-24')
+                    let ul = await page.$('ul.list-outside.list-disc.pl-24');
+                    
+                    let totalSpan = await page.evaluate(ul => {
+                        let liElem = ul.querySelectorAll('li');
+                        let str = '';
+
+                        liElem.forEach(li => {
+                            let span = li.querySelector('span');
+                            if (span) {
+                                str += span.textContent.trim() + ' ';
+                            }
+                        })
+                        return str.trim();
+                    }, ul)
+
+                    let threshold = 0;
+                    let matches = '';
+                    for(const key of keywords) {
+                        if(totalSpan.toLowerCase().includes(key.toLowerCase())) {
+                            threshold++;
+                            matches += key + " ";
+                        }
+                        if(threshold >= 3) {
+                            let title = await page.$eval('h1.font-bold.text-black.text-header-lg', el => el.textContent)
+                            let currentURL = page.url();
+                            let company_name = '';
+                            let job_location = '';
+
+                            const webhookClient = new WebhookClient({ url: ziprecruiterwebhook });
+
+                            const embed = new EmbedBuilder()
+                                .setTitle(`${title}`)
+                                .setURL(currentURL)
+                                .setFooter({text: `Matched keywords: ${matches}` })
+                                .setColor('#00FF00');
+
+                            // Send the embed
+                            webhookClient.send({
+                                content: '<@391055696713613315>',
+	                            username: 'Job Alert',
+                                embeds: [embed],
+                            });
+
+                            break;
+                        }
+                    }
+                    await job.click()
+
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+             
+                await page.waitForSelector('[title="Next Page"]')
                 await page.click('[title="Next Page"]')
                 await page.waitForNavigation();
-                i++;
-            }
+            
             await browser.close()
 
         }
     }
-    catch {
-        console.log("Oops")
+    catch(err) {
+        console.log(err)
     }
 }
